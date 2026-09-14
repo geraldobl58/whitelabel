@@ -1,0 +1,44 @@
+name: stock
+
+services:
+  stock-db:
+    image: postgres:16-alpine
+    container_name: stock-db
+    ports:
+      - "5536:5432"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=stockdb
+    volumes:
+      - /Volumes/Backup/DockerSSD/whitelabel/stockdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d stockdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - whitelabel-network
+
+  stock-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock-app
+    ports:
+      - "8085:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stock-db:5432/stockdb
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=admin
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery:8761/eureka
+    depends_on:
+      stock-db:
+        condition: service_healthy
+    networks:
+      - whitelabel-network
+
+networks:
+  whitelabel-network:
+    external: true

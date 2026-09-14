@@ -1,0 +1,45 @@
+name: notification
+
+services:
+  notification-mq:
+    image: rabbitmq:3-management-alpine
+    container_name: notification-mq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - /Volumes/Backup/DockerSSD/whitelabel/notificationmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - whitelabel-network
+
+  notification-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-app
+    ports:
+      - "8083:8080"
+    environment:
+      - SPRING_RABBITMQ_HOST=notification-mq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery:8761/eureka
+    depends_on:
+      notification-mq:
+        condition: service_healthy
+    networks:
+      - whitelabel-network
+
+networks:
+  whitelabel-network:
+    external: true

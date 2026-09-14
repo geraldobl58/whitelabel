@@ -1,0 +1,48 @@
+name: product
+
+services:
+  product-db:
+    image: postgres:16-alpine
+    container_name: product-db
+    env_file:
+      - .env
+    ports:
+      - "${DB_PORT}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - /Volumes/Backup/DockerSSD/whitelabel/productdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - whitelabel-network
+
+  product-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product-app
+    env_file:
+      - .env
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery:8761/eureka
+    depends_on:
+      product-db:
+        condition: service_healthy
+    networks:
+      - whitelabel-network
+
+networks:
+  whitelabel-network:
+    external: true
