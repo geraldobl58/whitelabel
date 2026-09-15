@@ -1,20 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="5a058fc2-40af-4449-9ff7-09dfe066711b" />
+    <option name="activeSessionId" value="63267bb4-cd59-4917-9b32-89337d80ba3e" />
     <option name="openSessionIds">
       <list>
         <option value="5a058fc2-40af-4449-9ff7-09dfe066711b" />
+        <option value="63267bb4-cd59-4917-9b32-89337d80ba3e" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
         <entry key="5a058fc2-40af-4449-9ff7-09dfe066711b" value="/sessions/new" />
+        <entry key="63267bb4-cd59-4917-9b32-89337d80ba3e" value="/sessions/8e70713e-392e-4e2f-82c4-45fc16e021b6" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
         <entry key="5a058fc2-40af-4449-9ff7-09dfe066711b" value="Claude Code" />
+        <entry key="63267bb4-cd59-4917-9b32-89337d80ba3e" value="é melhor ter docker compose e docker file separado" />
       </map>
     </option>
   </component>

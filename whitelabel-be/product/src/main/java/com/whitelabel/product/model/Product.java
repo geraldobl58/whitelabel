@@ -1,5 +1,7 @@
 package com.whitelabel.product.model;
 
+import com.whitelabel.product.category.model.Category;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +40,10 @@ public class Product {
 
     @Embedded
     private Price price;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

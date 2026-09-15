@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.UUID;
 
 public record ProductRequestDTO(
         @NotBlank(message = "Title is required")
@@ -27,6 +28,9 @@ public record ProductRequestDTO(
 
         @NotNull(message = "Price is required")
         @Valid
-        Price price
+        Price price,
+
+        @NotNull(message = "Category is required")
+        UUID categoryId
 ) {
 }

@@ -15,6 +15,7 @@ public record ProductResponseDTO(
         String description,
         String status,
         Price price,
+        UUID categoryId,
         LocalDateTime createdAt
 ) {
 }
