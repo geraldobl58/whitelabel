@@ -1,6 +1,7 @@
 package com.whitelabel.product.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -65,6 +66,20 @@ public class GlobalControllerAdvice {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle("Bad Request");
         problemDetail.setType(URI.create("https://example.com/bad-request"));
+        problemDetail.setProperty("timestamp", Instant.now());
+
+        return problemDetail;
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+
+        log.warn("Data integrity violation: {}", ex.getMessage());
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "This resource cannot be removed or changed because it is still referenced by another resource");
+        problemDetail.setTitle("Conflict");
+        problemDetail.setType(URI.create("https://example.com/conflict"));
         problemDetail.setProperty("timestamp", Instant.now());
 
         return problemDetail;

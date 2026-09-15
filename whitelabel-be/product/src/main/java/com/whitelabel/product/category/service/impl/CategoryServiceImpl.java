@@ -13,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -55,9 +58,7 @@ public class CategoryServiceImpl implements ICategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
         category.setTitle(requestDTO.title());
-
-        category.getSubcategories().clear();
-        category.getSubcategories().addAll(buildChildren(requestDTO.subcategories(), category));
+        reconcileChildren(category, requestDTO.subcategories());
 
         Category updateCategory = categoryRepository.save(category);
 
@@ -92,5 +93,36 @@ public class CategoryServiceImpl implements ICategoryService {
         return subcategories.stream()
                 .map(subcategory -> buildTree(subcategory, parent))
                 .toList();
+    }
+
+    /**
+     * Matches each item in {@code requests} against the parent's current subcategories by id:
+     * existing ids are updated in place (recursively), items without a matching id are created,
+     * and any current child whose id is absent from {@code requests} is dropped from the
+     * collection (deleted via orphanRemoval on save).
+     */
+    private void reconcileChildren(Category parent, List<CategoryRequestDTO> requests) {
+        List<CategoryRequestDTO> childRequests = requests == null ? List.of() : requests;
+
+        Map<UUID, Category> existingById = parent.getSubcategories().stream()
+                .filter(child -> child.getId() != null)
+                .collect(Collectors.toMap(Category::getId, Function.identity()));
+
+        List<Category> reconciled = new ArrayList<>();
+        for (CategoryRequestDTO request : childRequests) {
+            Category child = request.id() != null ? existingById.get(request.id()) : null;
+
+            if (child == null) {
+                child = buildTree(request, parent);
+            } else {
+                child.setTitle(request.title());
+                reconcileChildren(child, request.subcategories());
+            }
+
+            reconciled.add(child);
+        }
+
+        parent.getSubcategories().clear();
+        parent.getSubcategories().addAll(reconciled);
     }
 }
