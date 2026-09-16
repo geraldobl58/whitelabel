@@ -1,5 +1,7 @@
 package com.whitelabel.product.controller;
 
+import com.whitelabel.product.dto.PageResponseDTO;
+import com.whitelabel.product.dto.ProductFilterDTO;
 import com.whitelabel.product.dto.ProductRequestDTO;
 import com.whitelabel.product.dto.ProductResponseDTO;
 import com.whitelabel.product.service.impl.ProductServiceImpl;
@@ -11,10 +13,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Products", description = "Product catalog. Every product belongs to exactly one category or subcategory via categoryId.")
@@ -63,11 +66,26 @@ class ProductController {
         return productService.create(productRequestDTO);
     }
 
-    @Operation(summary = "List all products")
+    @Operation(
+            summary = "List products (paginated + filters)",
+            description = """
+                    All filters are optional and combine with AND. `title` and `brand` are partial and \
+                    case-insensitive; `status` is exact; `minPrice`/`maxPrice` bound the original price.
+
+                    `categoryId` matches the category **and everything below it in the tree** — filtering by \
+                    "Acessorios" also returns products filed under "Capas de Silicone". Pass \
+                    `includeSubcategories=false` to match that one category exactly.
+
+                    Pages are 10 items by default: `?page=0&size=10&sort=createdAt,desc`.
+                    """
+    )
+    @ApiResponse(responseCode = "404", description = "categoryId does not match any category")
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<ProductResponseDTO> findAll() {
-        return productService.findAll();
+    public PageResponseDTO<ProductResponseDTO> findAll(
+            @ParameterObject ProductFilterDTO filter,
+            @ParameterObject Pageable pageable) {
+        return productService.findAll(filter, pageable);
     }
 
     @Operation(summary = "Get a product by id")

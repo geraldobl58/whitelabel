@@ -23,6 +23,9 @@ public class Category {
     @Column(name = "title", nullable = false)
     private String title;
 
+    @Column(name = "slug", nullable = false, unique = true)
+    private String slug;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private Category parent;

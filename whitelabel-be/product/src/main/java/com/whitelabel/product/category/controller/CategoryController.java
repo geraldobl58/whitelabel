@@ -3,7 +3,9 @@ package com.whitelabel.product.category.controller;
 import com.whitelabel.product.category.dto.CategoryRequestDTO;
 import com.whitelabel.product.category.dto.CategoryResponseDTO;
 import com.whitelabel.product.category.service.impl.CategoryServiceImpl;
+import com.whitelabel.product.dto.PageResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,10 +14,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(
@@ -65,6 +68,14 @@ class CategoryController {
             }
             """;
 
+    private static final String SLUG_EXAMPLE = """
+            {
+              "title": "Acessorios",
+              "slug": "acessorios-promo",
+              "subcategories": []
+            }
+            """;
+
     private final CategoryServiceImpl categoryService;
 
     @Operation(
@@ -85,13 +96,25 @@ class CategoryController {
     }
 
     @Operation(
-            summary = "List root categories",
-            description = "Returns every top-level category (no parent), each with its full subcategory tree nested inside."
+            summary = "List categories (paginated)",
+            description = """
+                    Without `title`, returns top-level categories only — each already carries its full subtree \
+                    nested inside, so listing descendants as separate rows would just repeat them.
+
+                    With `title`, searches every level of the tree (partial, case-insensitive) and returns each \
+                    matching category along with the subtree below it — this is how you find a deep subcategory \
+                    and its `id` to use in an update or in `POST /api/v1/products`.
+
+                    Pages are 10 items by default: `?page=0&size=10&sort=title,asc`.
+                    """
     )
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<CategoryResponseDTO> findAll() {
-        return categoryService.findAll();
+    public PageResponseDTO<CategoryResponseDTO> findAll(
+            @Parameter(description = "Partial, case-insensitive search across every level of the tree", example = "capas")
+            @RequestParam(required = false) String title,
+            @ParameterObject Pageable pageable) {
+        return categoryService.findAll(title, pageable);
     }
 
     @Operation(
@@ -102,6 +125,19 @@ class CategoryController {
     @GetMapping("/{id}")
     public CategoryResponseDTO findById(@PathVariable UUID id) {
         return categoryService.findById(id);
+    }
+
+    @Operation(
+            summary = "Get a category by slug",
+            description = "Storefront-friendly lookup for URLs like /c/capas-de-silicone, with no UUID involved. "
+                    + "Returns the category and the subtree below it."
+    )
+    @ApiResponse(responseCode = "404", description = "No category with that slug")
+    @GetMapping("/slug/{slug}")
+    public CategoryResponseDTO findBySlug(
+            @Parameter(description = "URL-friendly identifier", example = "capas-de-silicone")
+            @PathVariable String slug) {
+        return categoryService.findBySlug(slug);
     }
 
     @Operation(
@@ -121,6 +157,9 @@ class CategoryController {
                     The example below renames "Acessórios" to "Acessórios para Celular", keeps the existing \
                     "Capas e Cases" > "Capas de Silicone" branch (by id), drops "Películas de Proteção" (omitted), \
                     and adds a brand new "Suportes Veiculares" subcategory.
+
+                    Renaming does **not** rewrite the slug — already-published URLs would break. Send an explicit \
+                    `slug` (second example) when you actually want the URL to move.
                     """
     )
     @ApiResponse(responseCode = "200", description = "Tree updated")
@@ -132,7 +171,10 @@ class CategoryController {
             @PathVariable UUID id,
             @Valid @RequestBody(description = "Category title plus the reconciled subcategories tree", required = true,
                     content = @Content(schema = @Schema(implementation = CategoryRequestDTO.class),
-                            examples = @ExampleObject(name = "Rename + keep/add/remove subcategories", value = UPDATE_EXAMPLE)))
+                            examples = {
+                                    @ExampleObject(name = "Rename + keep/add/remove subcategories", value = UPDATE_EXAMPLE),
+                                    @ExampleObject(name = "Change the slug explicitly", value = SLUG_EXAMPLE)
+                            }))
             @org.springframework.web.bind.annotation.RequestBody CategoryRequestDTO categoryRequestDTO) {
         return categoryService.update(id, categoryRequestDTO);
     }

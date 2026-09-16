@@ -7,6 +7,7 @@ import java.util.UUID;
 public record CategoryResponseDTO(
         UUID id,
         String title,
+        String slug,
         List<CategoryResponseDTO> subcategories,
         LocalDateTime createdAt
 ) {

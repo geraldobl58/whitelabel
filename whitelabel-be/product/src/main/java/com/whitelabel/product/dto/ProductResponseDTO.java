@@ -1,5 +1,6 @@
 package com.whitelabel.product.dto;
 
+import com.whitelabel.product.category.dto.CategorySummaryDTO;
 import com.whitelabel.product.model.Price;
 
 import java.time.LocalDateTime;
@@ -15,7 +16,7 @@ public record ProductResponseDTO(
         String description,
         String status,
         Price price,
-        UUID categoryId,
+        CategorySummaryDTO category,
         LocalDateTime createdAt
 ) {
 }
