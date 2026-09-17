@@ -9,11 +9,11 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI productOpenAPI() {
+    public OpenAPI stockOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
                         .title("Stock Service API")
-                        .description("Manages stocks")
+                        .description("Tracks available quantity per SKU and answers availability checks.")
                         .version("v1"));
     }
 }

@@ -1,5 +1,6 @@
 package com.whitelabel.stock.service.impl;
 
+import com.whitelabel.stock.dto.PageResponseDTO;
 import com.whitelabel.stock.dto.StockRequestDTO;
 import com.whitelabel.stock.dto.StockResponseDTO;
 import com.whitelabel.stock.exception.ResourceNotFoundException;
@@ -9,10 +10,10 @@ import com.whitelabel.stock.repository.IStockRepository;
 import com.whitelabel.stock.service.IStockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -49,11 +50,10 @@ public class StockService implements IStockService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StockResponseDTO> findAll() {
-        return stockRepository.findAll()
-                .stream()
-                .map(stockMapper::toResponse)
-                .toList();
+    public PageResponseDTO<StockResponseDTO> findAll(Pageable pageable) {
+        return PageResponseDTO.from(
+                stockRepository.findAll(pageable).map(stockMapper::toResponse)
+        );
     }
 
     @Override
