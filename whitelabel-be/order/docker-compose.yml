@@ -4,16 +4,18 @@ services:
   order-db:
     image: postgres:16-alpine
     container_name: order-db
+    env_file:
+      - .env
     ports:
-      - "5535:5432"
+      - "${DB_PORT}:5432"
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
-      - POSTGRES_DB=orderdb
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - /Volumes/Backup/DockerSSD/whitelabel/orderdb:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d orderdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -26,12 +28,14 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: order-app
+    env_file:
+      - .env
     ports:
       - "8084:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://order-db:5432/orderdb
-      - SPRING_DATASOURCE_USERNAME=admin
-      - SPRING_DATASOURCE_PASSWORD=admin
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery:8761/eureka
     depends_on:
       order-db:
