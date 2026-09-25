@@ -38,9 +38,9 @@ public class OrderServiceImpl implements IOrderService {
     private boolean ordersEnabled;
 
     public OrderResponseDTO fallbackMethod(OrderRequestDTO orderRequestDTO, String userId, Throwable throwable) {
-        log.error("Circuit Breaker activated. Cause: {}", throwable.getMessage());
+        log.error("😭Circuit Breaker activated. Cause: {}", throwable.getMessage());
 
-        throw new RuntimeException("Circuit Breaker activated. Cause: " + throwable.getMessage());
+        throw new RuntimeException("😭Circuit Breaker activated. Cause: " + throwable.getMessage());
     }
 
     @Override
