@@ -12,6 +12,7 @@ import com.whitelabel.order.service.client.IStockClient;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
+import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +25,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -37,56 +39,71 @@ public class OrderServiceImpl implements IOrderService {
     @Value("${order.enabled:true}")
     private boolean ordersEnabled;
 
-    public OrderResponseDTO fallbackMethod(OrderRequestDTO orderRequestDTO, String userId, Throwable throwable) {
-        log.error("😭Circuit Breaker activated. Cause: {}", throwable.getMessage());
+    public CompletableFuture<OrderResponseDTO> fallbackMethod(OrderRequestDTO orderRequestDTO, String userId, Throwable throwable) {
+       return CompletableFuture.supplyAsync(() -> {
+            log.error("😭Circuit Breaker activated. Cause: {}", throwable.getMessage());
 
-        throw new RuntimeException("😭Circuit Breaker activated. Cause: " + throwable.getMessage());
+            throw new RuntimeException("😭Circuit Breaker activated. Cause: " + throwable.getMessage());
+        });
     }
 
     @Override
     @Transactional
     @CircuitBreaker(name = "stock", fallbackMethod = "fallbackMethod")
     @Retry(name = "stock")
-    public OrderResponseDTO create(OrderRequestDTO orderRequestDTO, String userId) {
-        if (!ordersEnabled) {
-            log.warn("Order error: The service disabled for configuration");
-            throw new RuntimeException("The service of order it's a maintenance");
-        }
+    @TimeLimiter(name = "stock")
+    public CompletableFuture<OrderResponseDTO> create(OrderRequestDTO orderRequestDTO, String userId) {
+        long startTime = System.currentTimeMillis();
 
-        log.info("Creating new order with {} item(s)", orderRequestDTO.getOrderItemList().size());
-
-        Order order = orderMapper.toOrder(orderRequestDTO);
-
-        order.setUserId(userId);
-
-        for(var item : order.getOrderItems()) {
-            String sku = item.getSku();
-            Integer quantity = item.getQuantity();
-
-            try {
-                stockClient.reduceStock(sku, quantity);
-            } catch (CallNotPermittedException ex) {
-                log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
-            } catch (WebClientResponseException.NotFound ex) {
-                log.error("Product not found for SKU {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Product not found to place the order!", ex);
-            } catch (WebClientResponseException ex) {
-                log.error("Inventory API error during reduction SKU {}: Status {} - {}", sku, ex.getStatusCode(), ex.getResponseBodyAsString());
-                throw new IllegalArgumentException("Error processing inventory: " + ex.getResponseBodyAsString(), ex);
-            } catch (Exception ex) {
-                log.error("Unexpected error while creating the order {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Error processing your request!", ex);
+        return CompletableFuture.supplyAsync(() -> {
+            if (!ordersEnabled) {
+                log.warn("Order error: The service disabled for configuration");
+                throw new RuntimeException("The service of order it's a maintenance");
             }
-        }
 
-        order.setOrderNumber(UUID.randomUUID().toString());
+            log.info("Creating new order with {} item(s)", orderRequestDTO.getOrderItemList().size());
 
-        Order savedOrder = orderRepository.save(order);
+            Order order = orderMapper.toOrder(orderRequestDTO);
 
-        log.info("Order saved with ID: {}", savedOrder.getId());
+            order.setUserId(userId);
 
-        return orderMapper.toOrderResponse(savedOrder);
+            for(var item : order.getOrderItems()) {
+                String sku = item.getSku();
+                Integer quantity = item.getQuantity();
+
+                try {
+                    stockClient.reduceStock(sku, quantity);
+                } catch (CallNotPermittedException ex) {
+                    log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
+                    throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
+                } catch (WebClientResponseException.NotFound ex) {
+                    log.error("Product not found for SKU {}: {}", sku, ex.getMessage());
+                    throw new IllegalArgumentException("Product not found to place the order!", ex);
+                } catch (WebClientResponseException ex) {
+                    log.error("Inventory API error during reduction SKU {}: Status {} - {}", sku, ex.getStatusCode(), ex.getResponseBodyAsString());
+                    throw new IllegalArgumentException("Error processing inventory: " + ex.getResponseBodyAsString(), ex);
+                } catch (Exception ex) {
+                    log.error("Unexpected error while creating the order {}: {}", sku, ex.getMessage());
+                    throw new IllegalArgumentException("Error processing your request!", ex);
+                }
+            }
+
+            order.setOrderNumber(UUID.randomUUID().toString());
+
+            long totalTime = System.currentTimeMillis() - startTime;
+
+            if (totalTime > 3000) {
+                log.warn("Timeout detected intermittent ({}) ms", totalTime);
+                throw new RuntimeException("Timeout exceeded rollback manual");
+            }
+
+            Order savedOrder = orderRepository.save(order);
+
+            log.info("Order saved with ID: {}", savedOrder.getId());
+
+            return orderMapper.toOrderResponse(savedOrder);
+        });
+
     }
 
     @Override

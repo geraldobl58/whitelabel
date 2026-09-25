@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Tag(
         name = "Orders",
@@ -65,7 +66,7 @@ class OrderController {
     @ApiResponse(responseCode = "400", description = "Validation error (empty item list, blank sku, price or quantity out of range)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public OrderResponseDTO create(
+    public CompletableFuture<OrderResponseDTO> create(
             @Valid @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "The items that make up the order", required = true,
                     content = @Content(schema = @Schema(implementation = OrderRequestDTO.class),
