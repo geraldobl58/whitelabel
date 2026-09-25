@@ -39,7 +39,8 @@ public class OrderServiceImpl implements IOrderService {
 
     public OrderResponseDTO fallbackMethod(OrderRequestDTO orderRequestDTO, String userId, Throwable throwable) {
         log.error("Circuit Breaker activated. Cause: {}", throwable.getMessage());
-        return new OrderResponseDTO(UUID.randomUUID(),"00000", Collections.emptyList());
+
+        throw new RuntimeException("Circuit Breaker activated. Cause: " + throwable.getMessage());
     }
 
     @Override
