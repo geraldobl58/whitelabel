@@ -11,6 +11,7 @@ import com.whitelabel.order.service.IOrderService;
 import com.whitelabel.order.service.client.IStockClient;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +45,7 @@ public class OrderServiceImpl implements IOrderService {
     @Override
     @Transactional
     @CircuitBreaker(name = "stock", fallbackMethod = "fallbackMethod")
+    @Retry(name = "stock")
     public OrderResponseDTO create(OrderRequestDTO orderRequestDTO, String userId) {
         if (!ordersEnabled) {
             log.warn("Order error: The service disabled for configuration");
