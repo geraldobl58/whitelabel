@@ -23,7 +23,7 @@ public class Order {
     @Column(name = "order_number", nullable = false, unique = true)
     private String orderNumber;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private String userId;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)

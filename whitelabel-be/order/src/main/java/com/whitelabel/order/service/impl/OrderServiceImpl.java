@@ -9,6 +9,9 @@ import com.whitelabel.order.model.Order;
 import com.whitelabel.order.repository.OrderRepository;
 import com.whitelabel.order.service.IOrderService;
 import com.whitelabel.order.service.client.IStockClient;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +32,7 @@ public class OrderServiceImpl implements IOrderService {
     private final OrderRepository orderRepository;
     private final IOrderMapper orderMapper;
     private final IStockClient stockClient;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Value("${order.enabled:true}")
     private boolean ordersEnabled;
@@ -47,12 +51,17 @@ public class OrderServiceImpl implements IOrderService {
 
         order.setUserId(userId);
 
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("stock");
+
         for(var item : order.getOrderItems()) {
             String sku = item.getSku();
             Integer quantity = item.getQuantity();
 
             try {
-                stockClient.reduceStock(sku, quantity);
+                circuitBreaker.executeRunnable(() -> stockClient.reduceStock(sku, quantity));
+            } catch (CallNotPermittedException ex) {
+                log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
+                throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
             } catch (WebClientResponseException.NotFound ex) {
                 log.error("Product not found for SKU {}: {}", sku, ex.getMessage());
                 throw new IllegalArgumentException("Product not found to place the order!", ex);
