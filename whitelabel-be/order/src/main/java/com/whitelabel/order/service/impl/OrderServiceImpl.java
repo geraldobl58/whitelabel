@@ -3,6 +3,7 @@ package com.whitelabel.order.service.impl;
 import com.whitelabel.order.dto.OrderRequestDTO;
 import com.whitelabel.order.dto.OrderResponseDTO;
 import com.whitelabel.order.dto.PageResponseDTO;
+import com.whitelabel.order.event.OrderPlacedEvent;
 import com.whitelabel.order.exception.ResourceNotFoundException;
 import com.whitelabel.order.mapper.IOrderMapper;
 import com.whitelabel.order.model.Order;
@@ -14,6 +15,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.domain.Page;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -32,7 +35,8 @@ import java.util.concurrent.CompletableFuture;
 public class OrderServiceImpl implements IOrderService {
     private final OrderRepository orderRepository;
     private final IOrderMapper orderMapper;
-    private final IStockClient stockClient;
+//    private final IStockClient stockClient;
+    private final RabbitTemplate rabbitTemplate;
 
     @Value("${order.enabled:true}")
     private boolean ordersEnabled;
@@ -45,8 +49,8 @@ public class OrderServiceImpl implements IOrderService {
 
     @Override
     @Transactional
-    @CircuitBreaker(name = "stock", fallbackMethod = "fallbackMethod")
-    @Retry(name = "stock")
+//    @CircuitBreaker(name = "stock", fallbackMethod = "fallbackMethod")
+//    @Retry(name = "stock")
     public OrderResponseDTO create(OrderRequestDTO orderRequestDTO, String userId) {
         if (!ordersEnabled) {
             log.warn("Order error: The service disabled for configuration");
@@ -59,34 +63,50 @@ public class OrderServiceImpl implements IOrderService {
 
         order.setUserId(userId);
 
-        for(var item : order.getOrderItems()) {
-            String sku = item.getSku();
-            Integer quantity = item.getQuantity();
-
-            try {
-                stockClient.reduceStock(sku, quantity);
-            } catch (CallNotPermittedException ex) {
-                log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
-            } catch (WebClientResponseException.NotFound ex) {
-                log.error("Product not found for SKU {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Product not found to place the order!", ex);
-            } catch (WebClientResponseException ex) {
-                log.error("Inventory API error during reduction SKU {}: Status {} - {}", sku, ex.getStatusCode(), ex.getResponseBodyAsString());
-                throw new IllegalArgumentException("Error processing inventory: " + ex.getResponseBodyAsString(), ex);
-            } catch (Exception ex) {
-                log.error("Unexpected error while creating the order {}: {}", sku, ex.getMessage());
-                throw new IllegalArgumentException("Error processing your request!", ex);
-            }
-        }
-
         order.setOrderNumber(UUID.randomUUID().toString());
 
         Order savedOrder = orderRepository.save(order);
 
         log.info("Order saved with ID: {}", savedOrder.getId());
 
+        List<OrderPlacedEvent.OrderItemEvent> orderItems =
+                order.getOrderItems().stream()
+                        .map(item -> new OrderPlacedEvent.OrderItemEvent(
+                                item.getSku(), item.getPrice().toString(), item.getQuantity()
+                        )).toList();
+
+        OrderPlacedEvent event = new OrderPlacedEvent(
+                savedOrder.getOrderNumber(), orderRequestDTO.getEmail(), orderItems
+        );
+
+        rabbitTemplate.convertAndSend("order-events", "order.placed", event);
+
+        log.info("Event send the RabbitMQ for the order: {}", savedOrder.getOrderNumber());
+
         return orderMapper.toOrderResponse(savedOrder);
+
+//        for(var item : order.getOrderItems()) {
+//            String sku = item.getSku();
+//            Integer quantity = item.getQuantity();
+//
+//            try {
+//                stockClient.reduceStock(sku, quantity);
+//            } catch (CallNotPermittedException ex) {
+//                log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
+//                throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
+//            } catch (WebClientResponseException.NotFound ex) {
+//                log.error("Product not found for SKU {}: {}", sku, ex.getMessage());
+//                throw new IllegalArgumentException("Product not found to place the order!", ex);
+//            } catch (WebClientResponseException ex) {
+//                log.error("Inventory API error during reduction SKU {}: Status {} - {}", sku, ex.getStatusCode(), ex.getResponseBodyAsString());
+//                throw new IllegalArgumentException("Error processing inventory: " + ex.getResponseBodyAsString(), ex);
+//            } catch (Exception ex) {
+//                log.error("Unexpected error while creating the order {}: {}", sku, ex.getMessage());
+//                throw new IllegalArgumentException("Error processing your request!", ex);
+//            }
+//        }
+
+
     }
 
     @Override
