@@ -10,8 +10,7 @@ import com.whitelabel.order.repository.OrderRepository;
 import com.whitelabel.order.service.IOrderService;
 import com.whitelabel.order.service.client.IStockClient;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.Collections;
 import java.util.UUID;
 
 @Service
@@ -32,13 +32,18 @@ public class OrderServiceImpl implements IOrderService {
     private final OrderRepository orderRepository;
     private final IOrderMapper orderMapper;
     private final IStockClient stockClient;
-    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Value("${order.enabled:true}")
     private boolean ordersEnabled;
 
+    public OrderResponseDTO fallbackMethod(OrderRequestDTO orderRequestDTO, String userId, Throwable throwable) {
+        log.error("Circuit Breaker activated. Cause: {}", throwable.getMessage());
+        return new OrderResponseDTO(UUID.randomUUID(),"00000", Collections.emptyList());
+    }
+
     @Override
     @Transactional
+    @CircuitBreaker(name = "stock", fallbackMethod = "fallbackMethod")
     public OrderResponseDTO create(OrderRequestDTO orderRequestDTO, String userId) {
         if (!ordersEnabled) {
             log.warn("Order error: The service disabled for configuration");
@@ -51,14 +56,12 @@ public class OrderServiceImpl implements IOrderService {
 
         order.setUserId(userId);
 
-        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("stock");
-
         for(var item : order.getOrderItems()) {
             String sku = item.getSku();
             Integer quantity = item.getQuantity();
 
             try {
-                circuitBreaker.executeRunnable(() -> stockClient.reduceStock(sku, quantity));
+                stockClient.reduceStock(sku, quantity);
             } catch (CallNotPermittedException ex) {
                 log.error("Stock service circuit breaker is open, SKU {}: {}", sku, ex.getMessage());
                 throw new IllegalArgumentException("Stock service is currently unavailable, try again later!", ex);
