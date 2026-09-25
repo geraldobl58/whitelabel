@@ -144,14 +144,6 @@ class StockController {
             @PathVariable String sku,
             @Parameter(description = "Units to subtract from the current quantity", example = "1")
             @RequestParam Integer quantity) {
-       try {
-           System.out.println("🙂‍↕️Stock sleep for 5 seconds");
-           Thread.sleep(5 * 1000);
-       } catch (Exception ex) {
-           throw new RuntimeException(ex);
-       }
-
         return stockService.reduceStock(sku, quantity);
-
     }
 }

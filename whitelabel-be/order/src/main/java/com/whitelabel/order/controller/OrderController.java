@@ -13,19 +13,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Tag(
         name = "Orders",
@@ -66,7 +62,7 @@ class OrderController {
     @ApiResponse(responseCode = "400", description = "Validation error (empty item list, blank sku, price or quantity out of range)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CompletableFuture<OrderResponseDTO> create(
+    public OrderResponseDTO create(
             @Valid @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "The items that make up the order", required = true,
                     content = @Content(schema = @Schema(implementation = OrderRequestDTO.class),
