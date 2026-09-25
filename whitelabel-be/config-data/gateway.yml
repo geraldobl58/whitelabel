@@ -1,0 +1,50 @@
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8086/realms/whitelabel
+        registration:
+          api-gateway-client:
+            provider: keycloak
+            client-id: api-gateway-client
+            client-secret: TOKEN
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/keycloak"
+            scope: openid
+
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8086/realms/whitelabel
+
+  cloud:
+    gateway:
+      default-filters:
+        - TokenRelay
+
+      routes:
+        - id: product
+          uri: lb://product
+          predicates:
+            - Path=/api/v1/products/**
+
+        - id: order
+          uri: lb://order
+          predicates:
+            - Path=/api/v1/orders/**
+
+        - id: stock
+          uri: lb://stock
+          predicates:
+            - Path=/api/v1/stocks/**
+
+server:
+  port: 9000

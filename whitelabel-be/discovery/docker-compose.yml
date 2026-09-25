@@ -1,0 +1,16 @@
+name: discovery
+
+services:
+  discovery-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: discovery-app
+    ports:
+      - "8761:8761"
+    networks:
+      - whitelabel-network
+
+networks:
+  whitelabel-network:
+    external: true
